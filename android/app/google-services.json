@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "600024381389",
+    "project_id": "sentinel-app-311e5",
+    "storage_bucket": "sentinel-app-311e5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:600024381389:android:69ea10840cf4e337f1b684",
+        "android_client_info": {
+          "package_name": "com.example.sentinel_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYrLPkhoPhe8qHuEmqNE876RZctJ9aHD0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:600024381389:android:92211527d4023efff1b684",
+        "android_client_info": {
+          "package_name": "com.example.sentinel_new_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAYrLPkhoPhe8qHuEmqNE876RZctJ9aHD0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:sentinel_new_app/services/service.dart';
 
 class AddElderlyPage extends StatefulWidget {
   const AddElderlyPage({super.key});
@@ -12,8 +10,6 @@ class AddElderlyPage extends StatefulWidget {
 }
 
 class _AddElderlyPageState extends State<AddElderlyPage> {
-  static const String _baseUrl = 'http://localhost:3000';
-
   final _fullNameController = TextEditingController();
   final _ageController = TextEditingController();
   final _addressController = TextEditingController();
@@ -61,53 +57,56 @@ class _AddElderlyPageState extends State<AddElderlyPage> {
 
     if (!_validate()) return;
 
+    final age = int.tryParse(_ageController.text.trim());
+
+    if (age == null || age <= 0) {
+      setState(() {
+        _errorMessage = 'Usia harus berupa angka yang valid.';
+      });
+      return;
+    }
+
     setState(() => _isLoading = true);
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+      await ApiService.addElderly(
+        fullName: _fullNameController.text.trim(),
+        age: age,
+        gender: _selectedGender!,
+        address: _addressController.text.trim(),
+        healthCondition: _healthConditionController.text.trim(),
+        notes: _notesController.text.trim(),
+      );
 
-      if (token == null) {
-        if (mounted) Navigator.pushReplacementNamed(context, '/');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Data lansia berhasil ditambahkan'),
+            backgroundColor: Color(0xFF1A1A2E),
+          ),
+        );
+
+        Navigator.pop(context, true);
+      }
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/');
+        }
         return;
       }
 
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/elderly'),
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'full_name': _fullNameController.text.trim(),
-          'age': int.parse(_ageController.text.trim()),
-          'gender': _selectedGender,
-          'address': _addressController.text.trim(),
-          'health_condition': _healthConditionController.text.trim(),
-          'notes': _notesController.text.trim(),
-        }),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Data lansia berhasil ditambahkan'),
-              backgroundColor: Color(0xFF1A1A2E),
-            ),
-          );
-          Navigator.pop(context, true); // kirim true → home_page refresh
-        }
-      } else {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _errorMessage = data['message'] ?? 'Gagal menyimpan data.';
-        });
-      }
+      setState(() {
+        _errorMessage = e.message;
+      });
     } catch (e) {
-      setState(() => _errorMessage = 'Tidak dapat terhubung ke server.');
+      setState(() {
+        _errorMessage = 'Tidak dapat terhubung ke server.';
+      });
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -148,14 +147,19 @@ class _AddElderlyPageState extends State<AddElderlyPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline,
-                        color: Color(0xFFDC2626), size: 16),
+                    const Icon(
+                      Icons.error_outline,
+                      color: Color(0xFFDC2626),
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         _errorMessage!,
                         style: const TextStyle(
-                            fontSize: 13, color: Color(0xFFDC2626)),
+                          fontSize: 13,
+                          color: Color(0xFFDC2626),
+                        ),
                       ),
                     ),
                   ],
@@ -202,18 +206,25 @@ class _AddElderlyPageState extends State<AddElderlyPage> {
                     style: TextStyle(color: Color(0xFFD1D5DB), fontSize: 14),
                   ),
                   isExpanded: true,
-                  icon: const Icon(Icons.keyboard_arrow_down,
-                      color: Color(0xFF9CA3AF)),
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down,
+                    color: Color(0xFF9CA3AF),
+                  ),
                   items: _genderOptions
-                      .map((g) => DropdownMenuItem(
-                            value: g,
-                            child: Text(g,
-                                style: const TextStyle(
-                                    fontSize: 14, color: Color(0xFF1A1A2E))),
-                          ))
+                      .map(
+                        (g) => DropdownMenuItem(
+                          value: g,
+                          child: Text(
+                            g,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF1A1A2E),
+                            ),
+                          ),
+                        ),
+                      )
                       .toList(),
-                  onChanged: (value) =>
-                      setState(() => _selectedGender = value),
+                  onChanged: (value) => setState(() => _selectedGender = value),
                 ),
               ),
             ),
@@ -323,8 +334,10 @@ class _AddElderlyPageState extends State<AddElderlyPage> {
         hintStyle: const TextStyle(color: Color(0xFFD1D5DB)),
         filled: true,
         fillColor: Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -335,8 +348,7 @@ class _AddElderlyPageState extends State<AddElderlyPage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
-          borderSide:
-              const BorderSide(color: Color(0xFF1A1A2E), width: 1.5),
+          borderSide: const BorderSide(color: Color(0xFF1A1A2E), width: 1.5),
         ),
       ),
     );

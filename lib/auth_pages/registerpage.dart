@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+
+import 'package:sentinel_new_app/services/service.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -10,8 +10,6 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  static const String _baseUrl = 'http://localhost:3000';
-
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -42,8 +40,7 @@ class _RegisterPageState extends State<RegisterPage> {
       return false;
     }
     if (_passwordController.text.length < 8) {
-      setState(
-          () => _errorMessage = 'Password minimal 8 karakter.');
+      setState(() => _errorMessage = 'Password minimal 8 karakter.');
       return false;
     }
     if (_passwordController.text != _confirmPasswordController.text) {
@@ -61,88 +58,88 @@ class _RegisterPageState extends State<RegisterPage> {
     setState(() => _isLoading = true);
 
     try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/api/auth/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'full_name': _fullNameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'password': _passwordController.text,
-        }),
+      await ApiService.register(
+        fullName: _fullNameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
       );
 
-      final data = jsonDecode(response.body);
+      if (!mounted) return;
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (!mounted) return;
-        // Tampilkan dialog sukses lalu balik ke login
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (ctx) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const SizedBox(height: 8),
-                Container(
-                  width: 56,
-                  height: 56,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFD1FAE5),
-                    borderRadius: BorderRadius.circular(28),
-                  ),
-                  child: const Icon(Icons.check,
-                      color: Color(0xFF059669), size: 28),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Akun Berhasil Dibuat!',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A2E),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Silakan masuk dengan akun baru Anda.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
-                ),
-                const SizedBox(height: 20),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      Navigator.pushReplacementNamed(context, '/');
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1A1A2E),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10)),
-                    ),
-                    child: const Text('Masuk Sekarang'),
-                  ),
-                ),
-              ],
-            ),
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-        );
-      } else {
-        setState(() {
-          _errorMessage = data['message'] ?? 'Pendaftaran gagal. Coba lagi.';
-        });
-      }
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFD1FAE5),
+                  borderRadius: BorderRadius.circular(28),
+                ),
+                child: const Icon(
+                  Icons.check,
+                  color: Color(0xFF059669),
+                  size: 28,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Akun Berhasil Dibuat!',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF1A1A2E),
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Silakan masuk dengan akun baru Anda.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    Navigator.pushReplacementNamed(context, '/');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1A1A2E),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: const Text('Masuk Sekarang'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } on ApiException catch (e) {
+      setState(() {
+        _errorMessage = e.message;
+      });
     } catch (e) {
-      setState(() =>
-          _errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi.');
+      setState(() {
+        _errorMessage = 'Tidak dapat terhubung ke server. Periksa koneksi.';
+      });
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -169,8 +166,11 @@ class _RegisterPageState extends State<RegisterPage> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
-                  child: const Icon(Icons.arrow_back,
-                      size: 18, color: Color(0xFF1A1A2E)),
+                  child: const Icon(
+                    Icons.arrow_back,
+                    size: 18,
+                    color: Color(0xFF1A1A2E),
+                  ),
                 ),
               ),
               const SizedBox(height: 28),
@@ -204,14 +204,19 @@ class _RegisterPageState extends State<RegisterPage> {
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.error_outline,
-                          color: Color(0xFFDC2626), size: 16),
+                      const Icon(
+                        Icons.error_outline,
+                        color: Color(0xFFDC2626),
+                        size: 16,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _errorMessage!,
                           style: const TextStyle(
-                              fontSize: 13, color: Color(0xFFDC2626)),
+                            fontSize: 13,
+                            color: Color(0xFFDC2626),
+                          ),
                         ),
                       ),
                     ],
@@ -283,19 +288,24 @@ class _RegisterPageState extends State<RegisterPage> {
                     disabledBackgroundColor: const Color(0xFF6B7280),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   child: _isLoading
                       ? const SizedBox(
                           width: 20,
                           height: 20,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
                         )
                       : const Text(
                           'Daftar',
                           style: TextStyle(
-                              fontSize: 15, fontWeight: FontWeight.w600),
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                 ),
               ),
@@ -308,8 +318,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   children: [
                     const Text(
                       'Sudah punya akun? ',
-                      style:
-                          TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
+                      style: TextStyle(fontSize: 13, color: Color(0xFF6B7280)),
                     ),
                     GestureDetector(
                       onTap: () => Navigator.pushReplacementNamed(context, '/'),
@@ -367,8 +376,10 @@ class _RegisterPageState extends State<RegisterPage> {
         prefixIcon: Icon(icon, size: 18, color: const Color(0xFF9CA3AF)),
         filled: true,
         fillColor: Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -402,8 +413,11 @@ class _RegisterPageState extends State<RegisterPage> {
       decoration: InputDecoration(
         hintText: hint,
         hintStyle: const TextStyle(color: Color(0xFFD1D5DB)),
-        prefixIcon: const Icon(Icons.lock_outline,
-            size: 18, color: Color(0xFF9CA3AF)),
+        prefixIcon: const Icon(
+          Icons.lock_outline,
+          size: 18,
+          color: Color(0xFF9CA3AF),
+        ),
         suffixIcon: IconButton(
           icon: Icon(
             obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
@@ -414,8 +428,10 @@ class _RegisterPageState extends State<RegisterPage> {
         ),
         filled: true,
         fillColor: Colors.white,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(10),
           borderSide: const BorderSide(color: Color(0xFFE5E7EB)),

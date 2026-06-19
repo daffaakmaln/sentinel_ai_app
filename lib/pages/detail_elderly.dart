@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:sentinel_new_app/services/service.dart';
 
 class ElderlyDetailPage extends StatefulWidget {
   const ElderlyDetailPage({super.key});
@@ -11,23 +9,28 @@ class ElderlyDetailPage extends StatefulWidget {
 }
 
 class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
-  static const String _baseUrl = 'http://localhost:3000';
-
   bool _isLoading = true;
   bool _isLoadingCameras = true;
   bool _isLoadingCaregivers = true;
   String? _errorMessage;
-  
+
   Map<String, dynamic>? _elderly;
   List<dynamic> _cameras = [];
   List<dynamic> _caregivers = [];
-  
+
   int? _elderlyId;
+
+  bool _initialized = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
+    if (_initialized) return;
+    _initialized = true;
+
     _elderlyId = ModalRoute.of(context)?.settings.arguments as int?;
+
     if (_elderlyId != null) {
       _fetchAllData();
     } else {
@@ -36,11 +39,6 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
         _errorMessage = 'ID lansia tidak valid';
       });
     }
-  }
-
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
   }
 
   Future<void> _fetchAllData() async {
@@ -52,78 +50,77 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
   }
 
   Future<void> _fetchElderlyDetail() async {
-    final token = await _getToken();
-    if (token == null) {
-      if (mounted) Navigator.pushReplacementNamed(context, '/');
-      return;
-    }
-
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/elderly/$_elderlyId'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final data = await ApiService.getElderlyById(_elderlyId!);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _elderly = data is Map ? data : (data['data'] ?? {});
-        });
-      } else if (response.statusCode == 401) {
-        if (mounted) Navigator.pushReplacementNamed(context, '/');
-      } else {
-        setState(() => _errorMessage = 'Gagal memuat detail lansia');
+      setState(() {
+        _elderly = data;
+      });
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/');
+        }
+        return;
       }
+
+      setState(() {
+        _errorMessage = e.message;
+      });
     } catch (e) {
-      setState(() => _errorMessage = 'Tidak dapat terhubung ke server');
+      setState(() {
+        _errorMessage = 'Tidak dapat terhubung ke server';
+      });
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _fetchCameras() async {
-    final token = await _getToken();
-    if (token == null) return;
-
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/elderly/$_elderlyId/cameras'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final data = await ApiService.getCamerasByElderly(_elderlyId!);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _cameras = data is List ? data : (data['data'] ?? []);
-        });
+      setState(() {
+        _cameras = data;
+      });
+    } on ApiException catch (e) {
+      if (e.isUnauthorized && mounted) {
+        Navigator.pushReplacementNamed(context, '/');
+        return;
       }
-    } catch (e) {
-      // ignore error, just show empty list
+
+      // biarkan list kosong
+    } catch (_) {
+      // biarkan list kosong
     } finally {
-      if (mounted) setState(() => _isLoadingCameras = false);
+      if (mounted) {
+        setState(() => _isLoadingCameras = false);
+      }
     }
   }
 
   Future<void> _fetchCaregivers() async {
-    final token = await _getToken();
-    if (token == null) return;
-
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/elderly/$_elderlyId/caregivers'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      final data = await ApiService.getCaregiversByElderly(_elderlyId!);
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _caregivers = data is List ? data : (data['data'] ?? []);
-        });
+      setState(() {
+        _caregivers = data;
+      });
+    } on ApiException catch (e) {
+      if (e.isUnauthorized && mounted) {
+        Navigator.pushReplacementNamed(context, '/');
+        return;
       }
-    } catch (e) {
-      // ignore error
+
+      // biarkan list kosong
+    } catch (_) {
+      // biarkan list kosong
     } finally {
-      if (mounted) setState(() => _isLoadingCaregivers = false);
+      if (mounted) {
+        setState(() => _isLoadingCaregivers = false);
+      }
     }
   }
 
@@ -158,20 +155,20 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
               child: CircularProgressIndicator(color: Color(0xFF1A1A2E)),
             )
           : _errorMessage != null
-              ? _buildErrorView()
-              : SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildProfileCard(),
-                      const SizedBox(height: 16),
-                      _buildCamerasSection(),
-                      const SizedBox(height: 16),
-                      _buildCaregiversSection(),
-                    ],
-                  ),
-                ),
+          ? _buildErrorView()
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildProfileCard(),
+                  const SizedBox(height: 16),
+                  _buildCamerasSection(),
+                  const SizedBox(height: 16),
+                  _buildCaregiversSection(),
+                ],
+              ),
+            ),
     );
   }
 
@@ -182,7 +179,10 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
         children: [
           const Icon(Icons.error_outline, color: Color(0xFF9CA3AF), size: 48),
           const SizedBox(height: 12),
-          Text(_errorMessage!, style: const TextStyle(color: Color(0xFF6B7280))),
+          Text(
+            _errorMessage!,
+            style: const TextStyle(color: Color(0xFF6B7280)),
+          ),
           const SizedBox(height: 16),
           ElevatedButton(
             onPressed: _fetchAllData,
@@ -246,8 +246,11 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
                     if (_elderly?['age'] != null)
                       Row(
                         children: [
-                          const Icon(Icons.cake_outlined,
-                              size: 14, color: Color(0xFF9CA3AF)),
+                          const Icon(
+                            Icons.cake_outlined,
+                            size: 14,
+                            color: Color(0xFF9CA3AF),
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             '${_elderly?['age']} tahun',
@@ -264,19 +267,31 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
             ],
           ),
           const Divider(height: 24, color: Color(0xFFEEEEEE)),
-          _buildInfoRow(Icons.phone_outlined, 'Nomor Telepon',
-              _elderly?['phone'] ?? _elderly?['phone_number'] ?? '-'),
+          _buildInfoRow(
+            Icons.phone_outlined,
+            'Nomor Telepon',
+            _elderly?['phone'] ?? _elderly?['phone_number'] ?? '-',
+          ),
           const SizedBox(height: 12),
-          _buildInfoRow(Icons.location_on_outlined, 'Alamat',
-              _elderly?['address'] ?? '-'),
+          _buildInfoRow(
+            Icons.location_on_outlined,
+            'Alamat',
+            _elderly?['address'] ?? '-',
+          ),
           const SizedBox(height: 12),
           if (_elderly?['medical_condition'] != null)
-            _buildInfoRow(Icons.medical_information_outlined, 'Riwayat Medis',
-                _elderly?['medical_condition'] ?? '-'),
+            _buildInfoRow(
+              Icons.medical_information_outlined,
+              'Riwayat Medis',
+              _elderly?['medical_condition'] ?? '-',
+            ),
           const SizedBox(height: 12),
           if (_elderly?['emergency_contact'] != null)
-            _buildInfoRow(Icons.emergency_outlined, 'Kontak Darurat',
-                _elderly?['emergency_contact'] ?? '-'),
+            _buildInfoRow(
+              Icons.emergency_outlined,
+              'Kontak Darurat',
+              _elderly?['emergency_contact'] ?? '-',
+            ),
         ],
       ),
     );
@@ -303,10 +318,7 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: Color(0xFF1A1A2E),
-                ),
+                style: const TextStyle(fontSize: 14, color: Color(0xFF1A1A2E)),
               ),
             ],
           ),
@@ -335,8 +347,11 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
             padding: EdgeInsets.all(16),
             child: Row(
               children: [
-                Icon(Icons.videocam_outlined,
-                    size: 20, color: Color(0xFF1A1A2E)),
+                Icon(
+                  Icons.videocam_outlined,
+                  size: 20,
+                  color: Color(0xFF1A1A2E),
+                ),
                 SizedBox(width: 8),
                 Text(
                   'Kamera Terpasang',
@@ -356,7 +371,9 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
                 child: SizedBox(
                   height: 40,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Color(0xFF1A1A2E)),
+                    strokeWidth: 2,
+                    color: Color(0xFF1A1A2E),
+                  ),
                 ),
               ),
             )
@@ -379,7 +396,8 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
 
   Widget _buildCameraItem(Map<String, dynamic> camera) {
     final cameraId = camera['id'];
-    final cameraName = camera['name'] ?? camera['camera_name'] ?? 'Kamera ${cameraId ?? ''}';
+    final cameraName =
+        camera['name'] ?? camera['camera_name'] ?? 'Kamera ${cameraId ?? ''}';
     final location = camera['location'] ?? '-';
     final status = camera['status'] ?? 'active';
 
@@ -387,9 +405,7 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade100),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade100)),
       ),
       child: Row(
         children: [
@@ -402,7 +418,9 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
             child: Icon(
               status == 'active' ? Icons.circle : Icons.circle_outlined,
               size: 16,
-              color: status == 'active' ? const Color(0xFF22C55E) : const Color(0xFFEF4444),
+              color: status == 'active'
+                  ? const Color(0xFF22C55E)
+                  : const Color(0xFFEF4444),
             ),
           ),
           const SizedBox(width: 12),
@@ -421,7 +439,10 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
                 const SizedBox(height: 2),
                 Text(
                   location,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF9CA3AF)),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF9CA3AF),
+                  ),
                 ),
               ],
             ),
@@ -486,7 +507,9 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
                 child: SizedBox(
                   height: 40,
                   child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Color(0xFF1A1A2E)),
+                    strokeWidth: 2,
+                    color: Color(0xFF1A1A2E),
+                  ),
                 ),
               ),
             )
@@ -516,9 +539,7 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Colors.grey.shade100),
-        ),
+        border: Border(top: BorderSide(color: Colors.grey.shade100)),
       ),
       child: Row(
         children: [
@@ -550,20 +571,30 @@ class _ElderlyDetailPageState extends State<ElderlyDetailPage> {
                 const SizedBox(height: 2),
                 Text(
                   role,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF9CA3AF),
+                  ),
                 ),
                 if (phone != '-') ...[
                   const SizedBox(height: 2),
                   Text(
                     phone,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF6B7280)),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                    ),
                   ),
                 ],
               ],
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.call_outlined, size: 18, color: Color(0xFF1A1A2E)),
+            icon: const Icon(
+              Icons.call_outlined,
+              size: 18,
+              color: Color(0xFF1A1A2E),
+            ),
             onPressed: () {
               // Bisa ditambah fungsi panggilan telepon
               ScaffoldMessenger.of(context).showSnackBar(

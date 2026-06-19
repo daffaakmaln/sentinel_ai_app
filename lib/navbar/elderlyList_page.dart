@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:sentinel_new_app/services/service.dart';
 
 // ─────────────────────────────────────────────
 // TAB 1: List Lansia
@@ -15,8 +13,6 @@ class ElderlyListPage extends StatefulWidget {
 }
 
 class ElderlyListPageState extends State<ElderlyListPage> {
-  static const String _baseUrl = 'http://localhost:3000';
-
   List<dynamic> _elderlyList = [];
   bool _isLoading = true;
   String? _errorMessage;
@@ -27,11 +23,6 @@ class ElderlyListPageState extends State<ElderlyListPage> {
     _fetchElderly();
   }
 
-  Future<String?> _getToken() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getString('token');
-  }
-
   Future<void> _fetchElderly() async {
     setState(() {
       _isLoading = true;
@@ -39,54 +30,59 @@ class ElderlyListPageState extends State<ElderlyListPage> {
     });
 
     try {
-      final token = await _getToken();
-      if (token == null) {
-        if (mounted) Navigator.pushReplacementNamed(context, '/');
+      final data = await ApiService.getElderlyList();
+
+      setState(() {
+        _elderlyList = data;
+      });
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/');
+        }
         return;
       }
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/elderly'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _elderlyList = data is List ? data : (data['data'] ?? []);
-        });
-      } else if (response.statusCode == 401) {
-        if (mounted) Navigator.pushReplacementNamed(context, '/');
-      } else {
-        setState(() => _errorMessage = 'Gagal memuat data.');
-      }
+      setState(() {
+        _errorMessage = e.message;
+      });
     } catch (e) {
-      setState(() => _errorMessage = 'Tidak dapat terhubung ke server.');
+      setState(() {
+        _errorMessage = 'Tidak dapat terhubung ke server.';
+      });
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   Future<void> _deleteElderly(int id) async {
-    final token = await _getToken();
-    if (token == null) return;
-
     try {
-      final response = await http.delete(
-        Uri.parse('$_baseUrl/api/elderly/$id'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
+      await ApiService.deleteElderly(id);
 
-      if (response.statusCode == 200) {
-        _fetchElderly();
+      await _fetchElderly();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Data lansia berhasil dihapus'),
+            backgroundColor: Color(0xFF1A1A2E),
+          ),
+        );
+      }
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Data lansia berhasil dihapus'),
-              backgroundColor: Color(0xFF1A1A2E),
-            ),
-          );
+          Navigator.pushReplacementNamed(context, '/');
         }
+        return;
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(e.message)));
       }
     } catch (e) {
       if (mounted) {
@@ -147,7 +143,10 @@ class ElderlyListPageState extends State<ElderlyListPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color.fromARGB(255, 0, 0, 0)),
+            icon: const Icon(
+              Icons.refresh,
+              color: Color.fromARGB(255, 0, 0, 0),
+            ),
             onPressed: _fetchElderly,
           ),
         ],
@@ -162,7 +161,9 @@ class ElderlyListPageState extends State<ElderlyListPage> {
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(color: Color.fromARGB(255, 25, 153, 199)),
+              child: CircularProgressIndicator(
+                color: Color.fromARGB(255, 25, 153, 199),
+              ),
             )
           : _errorMessage != null
           ? Center(
@@ -241,6 +242,13 @@ class ElderlyListPageState extends State<ElderlyListPage> {
                       ],
                     ),
                     child: ListTile(
+                      onTap: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/elderly/detail',
+                          arguments: id,
+                        );
+                      },
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 8,

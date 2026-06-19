@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
+import 'package:sentinel_new_app/services/service.dart';
 
 class CameraStatusPage extends StatefulWidget {
   const CameraStatusPage({super.key});
@@ -11,8 +9,6 @@ class CameraStatusPage extends StatefulWidget {
 }
 
 class _CameraStatusPageState extends State<CameraStatusPage> {
-  static const String _baseUrl = 'http://localhost:3000';
-
   // Sementara hardcode camera ID 1 karena prototype 1 kamera
   static const int _cameraId = 2;
 
@@ -32,43 +28,39 @@ class _CameraStatusPageState extends State<CameraStatusPage> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+      final data = await ApiService.getCameraStatusFrame(_cameraId);
 
-      if (token == null) {
-        if (mounted) Navigator.pushReplacementNamed(context, '/');
+      setState(() {
+        _cameraName = data['camera_name'] ?? 'Kamera $_cameraId';
+        _cameraStatus = data['camera_status'] ?? 'unknown';
+
+        _imageUrl = data['image_url'] != null
+            ? '${ApiService.baseUrl}${data['image_url']}'
+            : null;
+
+        _timestamp = data['timestamp'] ?? _formatNow();
+
+        _hasData = true;
+      });
+    } on ApiException catch (e) {
+      if (e.isUnauthorized) {
+        if (mounted) {
+          Navigator.pushReplacementNamed(context, '/');
+        }
         return;
       }
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/api/cameras/$_cameraId/status-frame'),
-        headers: {'Authorization': 'Bearer $token'},
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _cameraName = data['camera_name'] ?? 'Kamera $_cameraId';
-          _cameraStatus = data['camera_status'] ?? 'unknown';
-          _imageUrl = data['image_url'] != null
-              ? '$_baseUrl${data['image_url']}'
-              : null;
-          _timestamp = data['timestamp'] ?? _formatNow();
-          _hasData = true;
-        });
-      } else {
-        final data = jsonDecode(response.body);
-        setState(() {
-          _errorMessage = data['message'] ?? 'Gagal mengambil status kamera.';
-        });
-      }
+      setState(() {
+        _errorMessage = e.message;
+      });
     } catch (e) {
       setState(() {
-        // print(e);
         _errorMessage = 'Tidak dapat terhubung ke server.';
       });
     } finally {
-      if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -98,8 +90,7 @@ class _CameraStatusPageState extends State<CameraStatusPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isOnline =
-        _cameraStatus?.toLowerCase() == 'online';
+    final isOnline = _cameraStatus?.toLowerCase() == 'online';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
@@ -134,29 +125,29 @@ class _CameraStatusPageState extends State<CameraStatusPage> {
                         ),
                       )
                     : _hasData && _imageUrl != null
-                        ? Image.network(
-                            _imageUrl!,
-                            fit: BoxFit.cover,
-                            loadingBuilder: (context, child, progress) {
-                              if (progress == null) return child;
-                              return const Center(
-                                child: CircularProgressIndicator(
-                                  color: Color(0xFF1A1A2E),
-                                ),
-                              );
-                            },
-                            errorBuilder: (context, error, stack) =>
-                                _buildPlaceholderContent(
+                    ? Image.network(
+                        _imageUrl!,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) return child;
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: Color(0xFF1A1A2E),
+                            ),
+                          );
+                        },
+                        errorBuilder: (context, error, stack) =>
+                            _buildPlaceholderContent(
                               icon: Icons.broken_image_outlined,
                               label: 'Gagal memuat foto',
                             ),
-                          )
-                        : _buildPlaceholderContent(
-                            icon: Icons.videocam_outlined,
-                            label: _hasData
-                                ? 'Tidak ada foto tersedia'
-                                : 'Belum ada foto',
-                          ),
+                      )
+                    : _buildPlaceholderContent(
+                        icon: Icons.videocam_outlined,
+                        label: _hasData
+                            ? 'Tidak ada foto tersedia'
+                            : 'Belum ada foto',
+                      ),
               ),
             ),
             const SizedBox(height: 16),
@@ -181,8 +172,8 @@ class _CameraStatusPageState extends State<CameraStatusPage> {
                   _isLoading
                       ? 'Mengambil foto...'
                       : _hasData
-                          ? 'Perbarui Status'
-                          : 'Cek Status Kamera',
+                      ? 'Perbarui Status'
+                      : 'Cek Status Kamera',
                   style: const TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -213,8 +204,11 @@ class _CameraStatusPageState extends State<CameraStatusPage> {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.error_outline,
-                        color: Color(0xFFDC2626), size: 16),
+                    const Icon(
+                      Icons.error_outline,
+                      color: Color(0xFFDC2626),
+                      size: 16,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -267,11 +261,16 @@ class _CameraStatusPageState extends State<CameraStatusPage> {
                     // Status
                     Padding(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 14),
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                       child: Row(
                         children: [
-                          const Icon(Icons.circle,
-                              size: 18, color: Color(0xFF9CA3AF)),
+                          const Icon(
+                            Icons.circle,
+                            size: 18,
+                            color: Color(0xFF9CA3AF),
+                          ),
                           const SizedBox(width: 12),
                           Expanded(
                             child: Column(
@@ -288,7 +287,9 @@ class _CameraStatusPageState extends State<CameraStatusPage> {
                                 const SizedBox(height: 4),
                                 Container(
                                   padding: const EdgeInsets.symmetric(
-                                      horizontal: 10, vertical: 4),
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: isOnline
                                         ? const Color(0xFFD1FAE5)
@@ -356,10 +357,7 @@ class _CameraStatusPageState extends State<CameraStatusPage> {
         const SizedBox(height: 10),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 13,
-            color: Color(0xFF9CA3AF),
-          ),
+          style: const TextStyle(fontSize: 13, color: Color(0xFF9CA3AF)),
         ),
       ],
     );

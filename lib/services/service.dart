@@ -12,6 +12,7 @@ class ApiService {
   // Ganti sesuai environment:
   // Android Emulator → http://10.0.2.2:3000
   // HP fisik (WiFi)  → http://192.168.x.x:3000
+  // http://localhost:3000
   static const String baseUrl = 'http://localhost:3000';
 
   // ─────────────────────────────────────────────

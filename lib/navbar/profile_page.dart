@@ -44,7 +44,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     if (confirm == true) {
       await ApiService.logout();
-      if (mounted) Navigator.pushReplacementNamed(context, '/login');
+      if (mounted) Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
     }
   }
 

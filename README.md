@@ -1,8 +1,9 @@
 # Sentinel App 
 
-See Our FullStack Repo here:
+ See Our FullStack Repo here:
 - **Fall Detection AI**: [fall-detection-yolo](https://github.com/daffaakmaln/fall-detection-yolo) (Python)
 - **Backend**: [backend-sentinel](https://github.com/JonathanFaustinus/backend-sentinel) (Javascript)
+- **Frontend**: [sentinel_ai_app](https://github.com/daffaakmaln/sentinel_ai_app) (Flutter - Dart)
 
 Sentinel is a comprehensive mobile application built with **Flutter** designed for monitoring and managing the well-being of the elderly. This application acts as a companion interface to the Sentinel system, offering real-time camera statuses, event logs, elderly profile management, and instant push notifications for critical alerts.
 
